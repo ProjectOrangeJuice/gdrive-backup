@@ -9,11 +9,34 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/nextcloud"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
+
+var tokenFlag string
+
+func main() {
+	flag.StringVar(&tokenFlag, "auth", "", "Auth token")
+	flag.Parse()
+
+	// Setup gdrive..
+
+	// Setup nextcloud
+	nc, err := nextcloud.NewClient()
+	if err != nil {
+		log.Fatalf("Could not setup nextcloud because %s", err)
+	}
+
+	// Generate the list of files from google, with their modification times
+
+	// Generate the list of files from nextcloud, with their modification times
+
+	// Compare the list of files to work out what needs to be uploaded
+	// Generate a list of files, use works to upload the files
+}
 
 // Retrieve a token, saves the token, then returns the generated client.
 func getClient(config *oauth2.Config) *http.Client {
@@ -58,7 +81,7 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, err
 }
 
-func main() {
+func main2() {
 	// If flag -auth is set then we are setting a token
 	var token string
 	flag.StringVar(&token, "auth", "", "Auth token")

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"io/fs"
 	"os"
 
 	"github.com/studio-b12/gowebdav"
@@ -44,27 +44,35 @@ func getAuth() (auth, error) {
 func NewClient() (Client, error) {
 	authDetails, err := getAuth()
 	if err != nil {
-		log.Fatalf("%s", err)
+		return Client{}, err
 	}
 	client := gowebdav.NewClient(authDetails.Address, authDetails.Username, authDetails.Password)
 	err = client.Connect()
 	if err != nil {
-		fmt.Println("Error connecting:", err)
+		return Client{}, fmt.Errorf("error connecting: %s", err)
 	}
 
 	return Client{client: client}, nil
 }
 
-func (c *Client) ListFiles() {
-	files, err := c.client.ReadDir("/")
+func (c *Client) ListFiles(dir string) ([]fs.FileInfo, error) {
+	files, err := c.client.ReadDir(dir)
 	if err != nil {
-		fmt.Println("Error reading directory:", err)
-		return
+		return nil, fmt.Errorf("could not read directory, %s", err)
 	}
 
 	fmt.Println("Files on WebDAV server:")
 	for _, file := range files {
 		fmt.Println(file.Name())
 	}
+	return files, nil
+}
 
+func (c *Client) DownloadFile(path string) (io.ReadCloser, error) {
+	reader, err := c.client.ReadStream(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file, %s", err)
+	}
+
+	return reader, nil
 }

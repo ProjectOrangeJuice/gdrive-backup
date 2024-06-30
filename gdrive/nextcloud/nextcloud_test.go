@@ -10,6 +10,6 @@ func TestFileList(t *testing.T) {
 
 	c, err := NewClient()
 	require.NoError(t, err)
-	c.ListFiles()
+	c.ListFiles("/")
 	t.Fail()
 }
