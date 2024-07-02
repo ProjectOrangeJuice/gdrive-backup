@@ -7,3 +7,7 @@ type File struct {
 	Path   string
 	Reader io.ReadCloser
 }
+
+type Config struct {
+	Directories []string
+}

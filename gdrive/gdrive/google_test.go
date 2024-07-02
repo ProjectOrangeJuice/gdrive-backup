@@ -4,17 +4,20 @@ import (
 	"log"
 	"testing"
 
+	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/config"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGoogleList(t *testing.T) {
-	client, err := NewClient("")
+	conf := config.ReadConfig("../../config.json")
+	client, err := NewClient("", conf.GoogleBaseFolder)
 	require.NoError(t, err)
 	files, err := client.ListFiles()
 	require.NoError(t, err)
 
 	for _, f := range files {
-		log.Printf("file: %s, ext %s ", f.Name, f.FileExtension)
+		fullPath := GetFullPath(client, f.Parents[0])
+		log.Printf("file: %s,  path %s ", f.Name, fullPath)
 	}
 	t.Fail()
 }

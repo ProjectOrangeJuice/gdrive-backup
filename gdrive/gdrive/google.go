@@ -19,7 +19,7 @@ type Client struct {
 	Folders    map[string]string // a cached view of folder -> ID
 }
 
-func NewClient(authFlag string) (*Client, error) {
+func NewClient(authFlag, baseFolder string) (*Client, error) {
 	b, err := os.ReadFile("../../creds.json")
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
@@ -45,14 +45,18 @@ func NewClient(authFlag string) (*Client, error) {
 		return nil, fmt.Errorf("unable to retrieve Drive client: %v", err)
 	}
 
-	return &Client{client: srv}, nil
+	return &Client{client: srv, baseFolder: baseFolder}, nil
 }
 
 func (c *Client) ListFiles() ([]*drive.File, error) {
+	return c.listFiles(c.baseFolder)
+}
+
+func (c *Client) listFiles(baseFolder string) ([]*drive.File, error) {
 	var allFiles []*drive.File
 	pageToken := ""
 	for {
-		query := c.client.Files.List().Q("'" + c.baseFolder + "' in parents").Fields("files(name, modifiedTime)")
+		query := c.client.Files.List().Q("'" + baseFolder + "' in parents").Fields("files")
 		if pageToken != "" {
 			query = query.PageToken(pageToken)
 		}
@@ -61,6 +65,17 @@ func (c *Client) ListFiles() ([]*drive.File, error) {
 			return nil, fmt.Errorf("unable to retrieve files: %v", err)
 		}
 		allFiles = append(allFiles, r.Files...)
+		// Go through all the folders
+		for _, file := range r.Files {
+			if file.MimeType == "application/vnd.google-apps.folder" {
+				folderFiles, err := c.listFiles(file.Id)
+				if err != nil {
+					return nil, err
+				}
+				allFiles = append(allFiles, folderFiles...)
+			}
+		}
+
 		pageToken = r.NextPageToken
 		if pageToken == "" {
 			break
@@ -147,4 +162,37 @@ func (c *Client) UploadFile(file backup.File) error {
 	}
 	log.Printf("Uploaded %s", file.Name)
 	return nil
+}
+
+func (c *Client) GetFolderByID(folderID string) (*drive.File, error) {
+	// Get the folder details
+	folder, err := c.client.Files.Get(folderID).Fields("id,parents,name").Do()
+	if err != nil {
+		return nil, err
+	}
+
+	return folder, nil
+}
+
+func GetFullPath(client *Client, parentID string) string {
+	if parentID == "" {
+		return ""
+	}
+
+	// Get the name of the parent folder
+	parentFolder, err := client.GetFolderByID(parentID)
+	if err != nil {
+		log.Printf("Error getting parent folder: %v", err)
+		return ""
+	}
+
+	var parentPath string
+	if parentFolder.Id != client.baseFolder && len(parentFolder.Parents) > 0 {
+		parentPath = GetFullPath(client, parentFolder.Parents[0])
+	} else if parentFolder.Id == client.baseFolder {
+		return parentPath
+	}
+
+	// Construct the full path
+	return parentPath + "/" + parentFolder.Name
 }
