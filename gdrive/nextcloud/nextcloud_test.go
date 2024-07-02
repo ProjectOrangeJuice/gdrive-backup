@@ -10,6 +10,12 @@ func TestFileList(t *testing.T) {
 
 	c, err := NewClient()
 	require.NoError(t, err)
-	c.ListFiles("/")
+	fileList, err := c.ListAllFiles("/google-test")
+	require.NoError(t, err)
+
+	for _, file := range fileList {
+		t.Logf("File>%s, path>%s", file.Name(), file.Path)
+	}
+
 	t.Fail()
 }

@@ -16,7 +16,7 @@ func TestGoogleList(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, f := range files {
-		fullPath := GetFullPath(client, f.Parents[0])
+		fullPath := client.GetFullPath(f.Parents[0])
 		log.Printf("file: %s,  path %s ", f.Name, fullPath)
 	}
 	t.Fail()

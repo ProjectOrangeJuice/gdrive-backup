@@ -3,11 +3,11 @@ package gdrive
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/backup"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
@@ -142,7 +142,13 @@ func (c *Client) createFolder(folderName, parentID string) (string, error) {
 	return folderID, nil
 }
 
-func (c *Client) UploadFile(file backup.File) error {
+type File struct {
+	Name   string
+	Path   string
+	Reader io.ReadCloser
+}
+
+func (c *Client) UploadFile(file File) error {
 	defer file.Reader.Close()
 
 	folderID, err := c.GetFolder(file.Path)
@@ -174,7 +180,7 @@ func (c *Client) GetFolderByID(folderID string) (*drive.File, error) {
 	return folder, nil
 }
 
-func GetFullPath(client *Client, parentID string) string {
+func (client *Client) GetFullPath(parentID string) string {
 	if parentID == "" {
 		return ""
 	}
@@ -188,7 +194,7 @@ func GetFullPath(client *Client, parentID string) string {
 
 	var parentPath string
 	if parentFolder.Id != client.baseFolder && len(parentFolder.Parents) > 0 {
-		parentPath = GetFullPath(client, parentFolder.Parents[0])
+		parentPath = client.GetFullPath(parentFolder.Parents[0])
 	} else if parentFolder.Id == client.baseFolder {
 		return parentPath
 	}
