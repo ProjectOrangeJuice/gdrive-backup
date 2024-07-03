@@ -23,7 +23,7 @@ type Client struct {
 
 func getAuth() (auth, error) {
 	var a auth
-	f, err := os.Open("../../nextcloud.json")
+	f, err := os.Open("../nextcloud.json")
 	if err != nil {
 		return a, fmt.Errorf("could not read nextcloud.json, %s", err)
 	}
@@ -42,18 +42,18 @@ func getAuth() (auth, error) {
 	return a, nil
 }
 
-func NewClient() (Client, error) {
+func NewClient() (*Client, error) {
 	authDetails, err := getAuth()
 	if err != nil {
-		return Client{}, err
+		return nil, err
 	}
 	client := gowebdav.NewClient(authDetails.Address, authDetails.Username, authDetails.Password)
 	err = client.Connect()
 	if err != nil {
-		return Client{}, fmt.Errorf("error connecting: %s", err)
+		return nil, fmt.Errorf("error connecting: %s", err)
 	}
 
-	return Client{client: client}, nil
+	return &Client{client: client}, nil
 }
 
 func (c *Client) ListFiles(dir string) ([]ExtraFileInfo, error) {

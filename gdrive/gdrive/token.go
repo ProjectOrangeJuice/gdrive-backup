@@ -11,7 +11,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const tokenFile = "../../token.json"
+const tokenFile = "../token.json"
 
 func handleToken(token string, config *oauth2.Config) error {
 	exchangeToken, err := config.Exchange(context.TODO(), token)

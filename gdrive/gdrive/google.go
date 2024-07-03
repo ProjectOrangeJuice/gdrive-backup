@@ -20,7 +20,7 @@ type Client struct {
 }
 
 func NewClient(authFlag, baseFolder string) (*Client, error) {
-	b, err := os.ReadFile("../../creds.json")
+	b, err := os.ReadFile("../creds.json")
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
 	}
