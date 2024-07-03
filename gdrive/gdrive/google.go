@@ -19,6 +19,8 @@ type Client struct {
 	Folders    map[string]string // a cached view of folder -> ID
 }
 
+const Scope = drive.DriveFileScope
+
 func NewClient(authFlag, baseFolder string) (*Client, error) {
 	b, err := os.ReadFile("../creds.json")
 	if err != nil {
@@ -26,13 +28,16 @@ func NewClient(authFlag, baseFolder string) (*Client, error) {
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, drive.DriveMetadataReadonlyScope)
+	config, err := google.ConfigFromJSON(b, Scope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file, %s", err)
 	}
 
 	if authFlag != "" {
-		return nil, handleToken(authFlag, config)
+		err := handleToken(authFlag, config)
+		if err != nil {
+			return nil, err
+		}
 	}
 	client, err := getClient(config)
 	if err != nil {
@@ -44,8 +49,8 @@ func NewClient(authFlag, baseFolder string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve Drive client: %v", err)
 	}
-
-	return &Client{client: srv, baseFolder: baseFolder}, nil
+	folders := make(map[string]string)
+	return &Client{client: srv, baseFolder: baseFolder, Folders: folders}, nil
 }
 
 func (c *Client) ListFiles() ([]*drive.File, error) {
@@ -56,7 +61,7 @@ func (c *Client) listFiles(baseFolder string) ([]*drive.File, error) {
 	var allFiles []*drive.File
 	pageToken := ""
 	for {
-		query := c.client.Files.List().Q("'" + baseFolder + "' in parents").Fields("files")
+		query := c.client.Files.List().Q("'" + baseFolder + "' in parents and trashed=false").Fields("files")
 		if pageToken != "" {
 			query = query.PageToken(pageToken)
 		}
@@ -94,24 +99,27 @@ func (c *Client) GetFolder(folderPath string) (string, error) {
 
 	// Create the folders recursively
 	var parentID string
-	for i, folder := range folders {
-		if i == 0 && folder == "" {
-			continue // Skip empty first folder
+	for _, folder := range folders {
+		if folder == "" {
+			continue
 		}
 		folderID, err := c.createFolder(folder, parentID)
 		if err != nil {
 			return "", fmt.Errorf("error creating folder: %v", err)
 		}
 		parentID = folderID
-		c.Folders[folderPath] = folderID // Cache the full path
 	}
+	c.Folders[folderPath] = parentID // Cache the full path
 
 	return parentID, nil
 }
 
 func (c *Client) createFolder(folderName, parentID string) (string, error) {
+	if parentID == "" {
+		parentID = c.baseFolder
+	}
 	// Search for the folder
-	r, err := c.client.Files.List().Q(fmt.Sprintf("'%s' in parents mimeType='application/vnd.google-apps.folder' and name='%s'", c.baseFolder, folderName)).
+	r, err := c.client.Files.List().Q(fmt.Sprintf("'%s' in parents and mimeType='application/vnd.google-apps.folder' and name='%s' and trashed=false", parentID, folderName)).
 		Fields("nextPageToken, files(id, name)").Do()
 	if err != nil {
 		return "", fmt.Errorf("error listing files: %v", err)
@@ -151,7 +159,9 @@ type File struct {
 func (c *Client) UploadFile(file File) error {
 	defer file.Reader.Close()
 
-	folderID, err := c.GetFolder(file.Path)
+	// file path without the file name
+	fp := strings.TrimSuffix(file.Path, file.Name)
+	folderID, err := c.GetFolder(fp)
 	if err != nil {
 		return fmt.Errorf("unable to get folder: %v", err)
 	}

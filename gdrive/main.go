@@ -53,8 +53,33 @@ func main() {
 		changes := backup.FindChanges(value, googleFiles)
 		if len(changes) > 0 {
 			log.Printf("Found changes.. [%+v]", changes)
+			uploadChanges(changes, nc, g)
 		} else {
 			log.Printf("No changes")
 		}
 	}
+}
+
+func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client) {
+	log.Printf("Uploading changes")
+
+	for _, change := range changes {
+		f, err := nc.DownloadFile(change.Path)
+		if err != nil {
+			log.Fatalf("Failed to get file for download, %s", err)
+		}
+
+		gfile := gdrive.File{
+			Name:   change.Name,
+			Path:   change.Path,
+			Reader: f,
+		}
+
+		err = g.UploadFile(gfile)
+		if err != nil {
+			log.Fatalf("Failed to upload file, %s", err)
+		}
+
+	}
+
 }

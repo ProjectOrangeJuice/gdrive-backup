@@ -13,6 +13,7 @@ type Item struct {
 	Path             string
 	ModificationTime time.Time
 	Dir              bool
+	Name             string
 }
 
 func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
@@ -20,6 +21,7 @@ func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var items []Item
 	for _, file := range files {
 		filePath := gclient.GetFullPath(file.Parents[0])
@@ -31,6 +33,7 @@ func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
 			Path:             filePath + "/" + file.Name,
 			ModificationTime: parsedTime,
 			Dir:              file.MimeType == "application/vnd.google-apps.folder",
+			Name:             file.Name,
 		})
 	}
 
@@ -48,6 +51,7 @@ func GenerateFileListFromNextcloud(nc *nextcloud.Client, dirs []string) (map[str
 		fl := make([]Item, len(files))
 		for index, file := range files {
 			fl[index] = Item{
+				Name:             file.Name(),
 				Path:             file.Path,
 				ModificationTime: file.ModTime(),
 				Dir:              file.IsDir(),
