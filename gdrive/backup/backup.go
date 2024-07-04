@@ -16,11 +16,13 @@ func FindChanges(nextcloudList []Item, googleList []Item) []Item {
 		uploadFile := true
 		for _, googleItem := range googleList {
 			if nextcloudItem.Path == googleItem.Path {
-				if nextcloudItem.ModificationTime == googleItem.ModificationTime {
+				if nextcloudItem.ModificationTime.Equal(googleItem.ModificationTime) {
 					log.Printf("File %s has not changed", nextcloudItem.Path)
 					uploadFile = false
 					break
 				}
+				log.Printf("File [%s] mod time is [%s] vs remote [%s]", nextcloudItem.Path, nextcloudItem.ModificationTime, googleItem.ModificationTime)
+				break
 			}
 		}
 

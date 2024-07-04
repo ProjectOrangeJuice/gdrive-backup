@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
@@ -151,9 +152,10 @@ func (c *Client) createFolder(folderName, parentID string) (string, error) {
 }
 
 type File struct {
-	Name   string
-	Path   string
-	Reader io.ReadCloser
+	Name         string
+	Path         string
+	ModifiedTime time.Time
+	Reader       io.ReadCloser
 }
 
 func (c *Client) UploadFile(file File) error {
@@ -165,10 +167,17 @@ func (c *Client) UploadFile(file File) error {
 	if err != nil {
 		return fmt.Errorf("unable to get folder: %v", err)
 	}
+	// get existing file
+	existing, err := c.GetFile(file.Name, folderID)
+	if err != nil {
+		return fmt.Errorf("unable to get existing file: %v", err)
+	}
+
 	// Create Drive file metadata
 	driveFile := &drive.File{
-		Name:    file.Name, // Use the filename as the Drive file name
-		Parents: []string{folderID},
+		Name:         file.Name, // Use the filename as the Drive file name
+		Parents:      []string{folderID},
+		ModifiedTime: file.ModifiedTime.Format(time.RFC3339),
 	}
 
 	// Upload the file
@@ -177,6 +186,18 @@ func (c *Client) UploadFile(file File) error {
 		return fmt.Errorf("error uploading file: %v", err)
 	}
 	log.Printf("Uploaded %s", file.Name)
+	if existing != nil {
+		c.DeleteFile(existing.Id)
+	}
+	return nil
+}
+
+func (c *Client) DeleteFile(fileID string) error {
+	err := c.client.Files.Delete(fileID).Do()
+	if err != nil {
+		return fmt.Errorf("error deleting file: %v", err)
+	}
+	log.Printf("Deleted %s", fileID)
 	return nil
 }
 
@@ -184,10 +205,27 @@ func (c *Client) GetFolderByID(folderID string) (*drive.File, error) {
 	// Get the folder details
 	folder, err := c.client.Files.Get(folderID).Fields("id,parents,name").Do()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tried to get the folder [%s] but got an error, %s", folderID, err)
 	}
 
 	return folder, nil
+}
+
+func (c *Client) GetFile(fileName, parentFolderID string) (*drive.File, error) {
+	r, err := c.client.Files.List().Q(fmt.Sprintf("'%s' in parents and name='%s' and trashed=false", parentFolderID, fileName)).
+		Fields("nextPageToken, files(id, name)").Do()
+	if err != nil {
+		return nil, fmt.Errorf("error get file %s: %v", fileName, err)
+	}
+
+	if len(r.Files) > 1 {
+		return nil, fmt.Errorf("matched more than one file when looking for %s in %s", fileName, parentFolderID)
+	}
+	if len(r.Files) == 0 {
+		return nil, nil
+	}
+
+	return r.Files[0], nil
 }
 
 func (client *Client) GetFullPath(parentID string) string {
