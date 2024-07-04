@@ -24,7 +24,15 @@ func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
 
 	var items []Item
 	for _, file := range files {
-		filePath := gclient.GetFullPath(file.Parents[0])
+		var filePath string
+		var err error
+		if file.MimeType != "application/vnd.google-apps.folder" {
+			filePath, err = gclient.GetFullPath(file.Parents[0])
+			if err != nil {
+				return nil, fmt.Errorf("when getting the full path for %s, got error %s", file.Name, err)
+			}
+		}
+
 		parsedTime, err := time.Parse(time.RFC3339, file.ModifiedTime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse time for %s, %s", filePath, err)

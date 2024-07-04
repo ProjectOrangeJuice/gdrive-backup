@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"sync"
 
 	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/backup"
 	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/config"
@@ -53,34 +54,57 @@ func main() {
 		changes := backup.FindChanges(value, googleFiles)
 		if len(changes) > 0 {
 			log.Printf("Found changes.. [%+v]", changes)
-			//uploadChanges(changes, nc, g)
+			uploadChanges(changes, nc, g, 4)
 		} else {
 			log.Printf("No changes")
 		}
 	}
 }
 
-func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client) {
-	log.Printf("Uploading changes")
+func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client, numWorkers int) {
+	log.Printf("Uploading changes with %d workers", numWorkers)
 
-	for _, change := range changes {
-		f, err := nc.DownloadFile(change.Path)
-		if err != nil {
-			log.Fatalf("Failed to get file for download, %s", err)
-		}
+	// Create a channel to receive upload tasks
+	tasks := make(chan backup.Item, len(changes))
 
-		gfile := gdrive.File{
-			Name:         change.Name,
-			Path:         change.Path,
-			Reader:       f,
-			ModifiedTime: change.ModificationTime,
-		}
+	// Create a wait group to track worker completion
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
 
-		err = g.UploadFile(gfile)
-		if err != nil {
-			log.Fatalf("Failed to upload file, %s", err)
-		}
+	// Start the workers
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for change := range tasks {
+				f, err := nc.DownloadFile(change.Path)
+				if err != nil {
+					log.Printf("Failed to get file for download: %s", err)
+					continue // Skip to the next file
+				}
+				gfile := gdrive.File{
+					Name:         change.Name,
+					Path:         change.Path,
+					Reader:       f,
+					ModifiedTime: change.ModificationTime,
+				}
 
+				err = g.UploadFile(gfile)
+				f.Close()
+				if err != nil {
+					log.Printf("Failed to upload file: %s", err)
+					continue // Skip to the next file
+				}
+				log.Printf("Uploaded %s", change.Name)
+			}
+		}()
 	}
 
+	// Send the upload tasks to the channel
+	for _, change := range changes {
+		tasks <- change
+	}
+	close(tasks)
+
+	// Wait for all workers to finish
+	wg.Wait()
 }

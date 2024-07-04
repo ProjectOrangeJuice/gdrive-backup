@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2/google"
@@ -17,6 +18,7 @@ import (
 type Client struct {
 	client     *drive.Service
 	baseFolder string
+	folderLock sync.Mutex        // so we can cache the folders without conflict
 	Folders    map[string]string // a cached view of folder -> ID
 }
 
@@ -51,7 +53,9 @@ func NewClient(authFlag, baseFolder string) (*Client, error) {
 		return nil, fmt.Errorf("unable to retrieve Drive client: %v", err)
 	}
 	folders := make(map[string]string)
-	return &Client{client: srv, baseFolder: baseFolder, Folders: folders}, nil
+	return &Client{client: srv,
+		baseFolder: baseFolder, Folders: folders,
+		folderLock: sync.Mutex{}}, nil
 }
 
 func (c *Client) ListFiles() ([]*drive.File, error) {
@@ -94,6 +98,8 @@ func (c *Client) GetFolder(folderPath string) (string, error) {
 	if id, ok := c.Folders[folderPath]; ok {
 		return id, nil
 	}
+	c.folderLock.Lock()
+	defer c.folderLock.Unlock()
 
 	// Split the path into individual folders
 	folders := strings.Split(folderPath, "/")
@@ -228,25 +234,28 @@ func (c *Client) GetFile(fileName, parentFolderID string) (*drive.File, error) {
 	return r.Files[0], nil
 }
 
-func (client *Client) GetFullPath(parentID string) string {
-	if parentID == "" {
-		return ""
+func (client *Client) GetFullPath(parentID string) (string, error) {
+	if parentID == "" || parentID == client.baseFolder {
+		return "", nil
 	}
 
 	// Get the name of the parent folder
 	parentFolder, err := client.GetFolderByID(parentID)
 	if err != nil {
-		log.Printf("Error getting parent folder: %v", err)
-		return ""
+
+		return "", fmt.Errorf("error getting parent folder: %v", err)
 	}
 
 	var parentPath string
 	if parentFolder.Id != client.baseFolder && len(parentFolder.Parents) > 0 {
-		parentPath = client.GetFullPath(parentFolder.Parents[0])
+		parentPath, err = client.GetFullPath(parentFolder.Parents[0])
+		if err != nil {
+			return "", fmt.Errorf("error getting parent path for %s: %v", parentFolder.Name, err)
+		}
 	} else if parentFolder.Id == client.baseFolder {
-		return parentPath
+		return parentPath, nil
 	}
 
 	// Construct the full path
-	return parentPath + "/" + parentFolder.Name
+	return parentPath + "/" + parentFolder.Name, nil
 }
