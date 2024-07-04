@@ -20,6 +20,7 @@ type Client struct {
 	baseFolder string
 	folderLock sync.Mutex        // so we can cache the folders without conflict
 	Folders    map[string]string // a cached view of folder -> ID
+	FolderIDs  map[string]string // a cached view of folderID -> Folder path
 }
 
 const Scope = drive.DriveFileScope
@@ -53,8 +54,10 @@ func NewClient(authFlag, baseFolder string) (*Client, error) {
 		return nil, fmt.Errorf("unable to retrieve Drive client: %v", err)
 	}
 	folders := make(map[string]string)
+	folderIDs := make(map[string]string)
 	return &Client{client: srv,
 		baseFolder: baseFolder, Folders: folders,
+		FolderIDs:  folderIDs,
 		folderLock: sync.Mutex{}}, nil
 }
 
@@ -239,6 +242,10 @@ func (client *Client) GetFullPath(parentID string) (string, error) {
 		return "", nil
 	}
 
+	if _, ok := client.FolderIDs[parentID]; ok {
+		return client.FolderIDs[parentID], nil
+	}
+
 	// Get the name of the parent folder
 	parentFolder, err := client.GetFolderByID(parentID)
 	if err != nil {
@@ -257,5 +264,7 @@ func (client *Client) GetFullPath(parentID string) (string, error) {
 	}
 
 	// Construct the full path
-	return parentPath + "/" + parentFolder.Name, nil
+	fullPath := parentPath + "/" + parentFolder.Name
+	client.FolderIDs[parentID] = fullPath
+	return fullPath, nil
 }
