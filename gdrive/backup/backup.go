@@ -2,10 +2,6 @@ package backup
 
 import "log"
 
-type Config struct {
-	Directories []string
-}
-
 // go through the lists and find out what files have changed or are missing
 func FindChanges(nextcloudList []Item, googleList []Item) []Item {
 	var uploadList []Item

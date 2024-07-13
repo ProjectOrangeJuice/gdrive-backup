@@ -7,8 +7,13 @@ import (
 )
 
 type config struct {
-	Directories      []string `json:"directories"`
-	GoogleBaseFolder string   `json:"googleBaseFolder"`
+	Directories      []DirectoryConfig `json:"directories"`
+	GoogleBaseFolder string            `json:"googleBaseFolder"`
+}
+
+type DirectoryConfig struct {
+	Dir        string
+	Encryption string
 }
 
 func ReadConfig(dir string) config {

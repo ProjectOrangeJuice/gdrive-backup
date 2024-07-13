@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/config"
 	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/gdrive"
 	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/nextcloud"
 )
@@ -48,11 +49,11 @@ func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
 	return items, nil
 }
 
-func GenerateFileListFromNextcloud(nc *nextcloud.Client, dirs []string) (map[string][]Item, error) {
+func GenerateFileListFromNextcloud(nc *nextcloud.Client, dirs []config.DirectoryConfig) (map[string][]Item, error) {
 	fileList := make(map[string][]Item)
 	for _, dir := range dirs {
 		log.Printf("Searching %s", dir)
-		files, err := nc.ListAllFiles(dir)
+		files, err := nc.ListAllFiles(dir.Dir)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +66,7 @@ func GenerateFileListFromNextcloud(nc *nextcloud.Client, dirs []string) (map[str
 				Dir:              file.IsDir(),
 			}
 		}
-		fileList[dir] = fl
+		fileList[dir.Dir] = fl
 	}
 	return fileList, nil
 }

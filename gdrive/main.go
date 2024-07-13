@@ -54,14 +54,25 @@ func main() {
 		changes := backup.FindChanges(value, googleFiles)
 		if len(changes) > 0 {
 			log.Printf("Found changes.. [%+v]", changes)
-			uploadChanges(changes, nc, g, 4)
+			uploadChanges(changes, nc, g, getEncFromConfig(key, conf.Directories), 4)
 		} else {
 			log.Printf("No changes")
 		}
 	}
 }
 
-func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client, numWorkers int) {
+// my dodgy code means I dont have the enc key when I want it
+func getEncFromConfig(key string, config []config.DirectoryConfig) string {
+	for _, dir := range config {
+		if dir.Dir == key {
+			return dir.Encryption
+		}
+	}
+	log.Panicf("Could not get key for %s", key)
+	return ""
+}
+
+func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client, encryption string, numWorkers int) {
 	log.Printf("Uploading changes with %d workers", numWorkers)
 
 	// Create a channel to receive upload tasks
@@ -81,6 +92,14 @@ func uploadChanges(changes []backup.Item, nc *nextcloud.Client, g *gdrive.Client
 					log.Printf("Failed to get file for download: %s", err)
 					continue // Skip to the next file
 				}
+
+				if encryption != "" {
+					f, err = backup.Encrypt([]byte(encryption), f)
+					if err != nil {
+						log.Panicf("Failed to encrypt file: %s", err)
+					}
+				}
+
 				gfile := gdrive.File{
 					Name:         change.Name,
 					Path:         change.Path,
