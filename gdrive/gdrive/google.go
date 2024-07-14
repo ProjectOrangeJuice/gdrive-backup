@@ -69,7 +69,7 @@ func (c *Client) listFiles(baseFolder string) ([]*drive.File, error) {
 	var allFiles []*drive.File
 	pageToken := ""
 	for {
-		query := c.client.Files.List().Q("'" + baseFolder + "' in parents and trashed=false").Fields("files")
+		query := c.client.Files.List().Q("'" + baseFolder + "' in parents and trashed=false").Fields("files, nextPageToken")
 		if pageToken != "" {
 			query = query.PageToken(pageToken)
 		}

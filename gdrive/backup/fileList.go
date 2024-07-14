@@ -46,6 +46,7 @@ func GenerateFileListFromGoogle(gclient *gdrive.Client) ([]Item, error) {
 		})
 	}
 
+	log.Printf("Got %d items", len(items))
 	return items, nil
 }
 
