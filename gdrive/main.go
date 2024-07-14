@@ -56,9 +56,11 @@ func main() {
 	for key, value := range nextcloudFiles {
 		log.Printf("Checking for changes in %s", key)
 		changes := backup.FindChanges(value, googleFiles)
-		if len(changes) > 0 && !dryRun {
+		if len(changes) > 0 {
 			log.Printf("Found changes.. [%+v]", changes)
-			uploadChanges(changes, nc, g, getEncFromConfig(key, conf.Directories), 4)
+			if !dryRun {
+				uploadChanges(changes, nc, g, getEncFromConfig(key, conf.Directories), 4)
+			}
 		} else {
 			log.Printf("No changes")
 		}
