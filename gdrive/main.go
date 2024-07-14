@@ -11,10 +11,14 @@ import (
 	"github.com/ProjectOrangeJuice/gdrive-backup/gdrive/nextcloud"
 )
 
-var tokenFlag string
+var (
+	tokenFlag string
+	dryRun    bool
+)
 
 func main() {
 	flag.StringVar(&tokenFlag, "auth", "", "Auth token")
+	flag.BoolVar(&dryRun, "dry-run", false, "Dry run")
 	flag.Parse()
 
 	// Read config json
@@ -52,7 +56,7 @@ func main() {
 	for key, value := range nextcloudFiles {
 		log.Printf("Checking for changes in %s", key)
 		changes := backup.FindChanges(value, googleFiles)
-		if len(changes) > 0 {
+		if len(changes) > 0 && !dryRun {
 			log.Printf("Found changes.. [%+v]", changes)
 			uploadChanges(changes, nc, g, getEncFromConfig(key, conf.Directories), 4)
 		} else {
